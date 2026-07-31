@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0b0e14">
   <title>生命棋局 · 红蓝对决</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=4">
 </head>
 <body>
   <noscript>
@@ -39,9 +39,9 @@
   <div id="start-screen" class="overlay">
     <div class="title">生命棋局</div>
     <div class="subtitle">红蓝对决 · 康威生命游戏</div>
-    <button class="mode-btn" type="button" onclick="startGame('pvp')">⚔️ 双人对战（同屏热座）</button>
-    <button class="mode-btn" type="button" onclick="startGame('pve')">🤖 人机对战（你是红方）</button>
-    <button class="mode-btn" type="button" onclick="startGame('watch')">👀 观战模式（AI 互斗）</button>
+    <button id="btn-pvp" class="mode-btn" type="button">⚔️ 双人对战（同屏热座）</button>
+    <button id="btn-pve" class="mode-btn" type="button">🤖 人机对战（你是红方）</button>
+    <button id="btn-watch" class="mode-btn" type="button">👀 观战模式（AI 互斗）</button>
     <div class="rules">
       <b>规则</b><br>
       · 红蓝各有一个带<b>白色光环</b>的角色，对角开局<br>
@@ -56,18 +56,18 @@
   <!-- 结算界面 -->
   <div id="over-screen" class="overlay" hidden>
     <h2 id="winner-text"></h2>
-    <button class="mode-btn" type="button" onclick="restart()">🔄 再来一局</button>
-    <button class="mode-btn ghost" type="button" onclick="goHome()">🏠 返回主菜单</button>
+    <button id="btn-again" class="mode-btn" type="button">🔄 再来一局</button>
+    <button id="btn-home" class="mode-btn ghost" type="button">🏠 返回主菜单</button>
   </div>
 
-  <script src="js/logger.js?v=3"></script>
-  <script src="js/lib/p5.min.js?v=3"></script>
-  <script src="js/config.js?v=3"></script>
-  <script src="js/grid.js?v=3"></script>
-  <script src="js/player.js?v=3"></script>
-  <script src="js/game.js?v=3"></script>
-  <script src="js/ai.js?v=3"></script>
-  <script src="js/renderer.js?v=3"></script>
-  <script src="js/main.js?v=3"></script>
+  <script src="js/logger.js?v=4"></script>
+  <script src="js/lib/p5.min.js?v=4"></script>
+  <script src="js/config.js?v=4"></script>
+  <script src="js/grid.js?v=4"></script>
+  <script src="js/player.js?v=4"></script>
+  <script src="js/game.js?v=4"></script>
+  <script src="js/ai.js?v=4"></script>
+  <script src="js/renderer.js?v=4"></script>
+  <script src="js/main.js?v=4"></script>
 </body>
 </html>

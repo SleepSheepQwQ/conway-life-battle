@@ -1,5 +1,11 @@
-/* 入口：p5 实例模式，接线输入（点击部署 / 滑动移动）、渲染与 UI
- * 初始化顺序：错误横幅（最先）→ 按钮与全局函数（不依赖 p5，保证始终可点）→ p5 启动
+/* 入口：p5 实例模式，接线输入、渲染与 UI
+ * 初始化顺序：错误横幅 → 按钮与全局函数（不依赖 p5）→ p5 启动
+ *
+ * ⚠️ 输入不使用 p5 的 touchStarted/mousePressed 等回调：
+ *    p5 对这些回调的 return false 会调用 e.preventDefault()，安卓 Chrome 实测
+ *    会取消 touchstart 的默认行为 → 浏览器不再合成 click 事件 → 所有按钮失灵。
+ *    因此改为原生 Pointer Events（配合 CSS touch-action:none 防滚动缩放），
+ *    全程不 preventDefault，click 正常触发。
  */
 (function () {
   'use strict';
@@ -7,8 +13,6 @@
   let game = null;
   let renderer = null;
   let lastMode = 'pve';
-  let touchStart = null;
-  let lastMove = null;
   let overShown = false;
   let hintTimer = null;
   let hintBase = '';
@@ -70,15 +74,14 @@
     $('start-screen').hidden = false;
   };
 
-  $('btn-restart').addEventListener('click', () => {
-    if (game) startGame(lastMode);
-  });
-  $('btn-red').addEventListener('click', () => {
-    if (game && game.mode === 'pvp') game.active = 'red';
-  });
-  $('btn-blue').addEventListener('click', () => {
-    if (game && game.mode === 'pvp') game.active = 'blue';
-  });
+  $('btn-pvp').addEventListener('click', () => startGame('pvp'));
+  $('btn-pve').addEventListener('click', () => startGame('pve'));
+  $('btn-watch').addEventListener('click', () => startGame('watch'));
+  $('btn-again').addEventListener('click', () => window.restart());
+  $('btn-home').addEventListener('click', () => window.goHome());
+  $('btn-restart').addEventListener('click', () => { if (game) window.restart(); });
+  $('btn-red').addEventListener('click', () => { if (game && game.mode === 'pvp') game.active = 'red'; });
+  $('btn-blue').addEventListener('click', () => { if (game && game.mode === 'pvp') game.active = 'blue'; });
 
   // 长按不弹菜单
   document.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -130,13 +133,14 @@
     $('over-screen').hidden = false;
   }
 
-  /* ---------- 3. p5 草图 ---------- */
+  /* ---------- 3. p5 草图（只负责渲染，不处理输入） ---------- */
   const sketch = (p) => {
     p.setup = () => {
-      p.createCanvas(window.innerWidth, window.innerHeight);
+      const canvas = p.createCanvas(window.innerWidth, window.innerHeight);
       p.frameRate(60);
       renderer = new Renderer(p);
       layout();
+      bindInput(canvas);
       L('p5_setup', { w: p.width, h: p.height, cell: renderer.layout.cell });
     };
 
@@ -152,52 +156,46 @@
 
     p.draw = () => {
       frameCount++;
+      if (frameCount <= 5) L('frame', { n: frameCount });
       const now = p.millis();
       if (!game) return;
       game.tick(now);
       renderer.draw(p, game, now);
       updateHUD(now);
       if (game.status === 'over' && !overShown) showOver();
-      if (frameCount <= 5) L('frame', { n: frameCount });
     };
 
-    /* —— 触摸输入 —— */
-    p.touchStarted = (e) => {
-      if (!game || game.status !== 'playing' || game.mode === 'watch') return false;
-      const t = (e && e.touches && e.touches[0]) || { clientX: p.mouseX, clientY: p.mouseY };
-      touchStart = { x: t.clientX, y: t.clientY };
-      lastMove = { ...touchStart };
-      return false;
-    };
+    /* —— 输入：原生 Pointer Events（不 preventDefault，保证 click 正常合成） —— */
+    function bindInput(canvas) {
+      let start = null;
+      let last = null;
 
-    p.touchMoved = (e) => {
-      const t = e && e.touches && e.touches[0];
-      if (t) lastMove = { x: t.clientX, y: t.clientY };
-      return false;
-    };
+      canvas.addEventListener('pointerdown', (e) => {
+        if (!game || game.status !== 'playing' || game.mode === 'watch') return;
+        start = { x: e.clientX, y: e.clientY };
+        last = { ...start };
+      });
 
-    p.touchEnded = () => { resolveGesture(); return false; };
+      canvas.addEventListener('pointermove', (e) => {
+        if (start) last = { x: e.clientX, y: e.clientY };
+      });
 
-    /* —— 鼠标输入（桌面调试） —— */
-    p.mousePressed = () => {
-      if (!game || game.status !== 'playing' || game.mode === 'watch') return false;
-      touchStart = { x: p.mouseX, y: p.mouseY };
-      lastMove = { ...touchStart };
-      return false;
-    };
+      canvas.addEventListener('pointerup', () => {
+        if (!start) return;
+        resolveGesture(start, last);
+        start = null;
+      });
 
-    p.mouseReleased = () => { resolveGesture(); return false; };
+      canvas.addEventListener('pointercancel', () => { start = null; });
+    }
 
-    function resolveGesture() {
-      if (!touchStart || !game || game.status !== 'playing' || game.mode === 'watch') {
-        touchStart = null;
-        return;
-      }
-      const end = lastMove || touchStart;
-      const dx = end.x - touchStart.x;
-      const dy = end.y - touchStart.y;
+    /* 点击（位移 < 14px）→ 部署；滑动 → 移动一格 */
+    function resolveGesture(start, last) {
+      const end = last || start;
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
       const player = activeHuman();
-      if (!player) { touchStart = null; return; }
+      if (!player) return;
 
       const rect = p.canvas.getBoundingClientRect();
       const sx = end.x - rect.left;
@@ -221,13 +219,9 @@
         const ty = player.charY + my;
         const ok = game.move(player, tx, ty, now);
         L('action', { type: 'move', x: tx, y: ty, ok, mode: game.mode });
-        if (ok) {
-          flashHint('🚶 ' + player.name + ' 移动一格');
-        } else {
-          flashHint('❌ 不能移动');
-        }
+        if (ok) flashHint('🚶 ' + player.name + ' 移动一格');
+        else flashHint('❌ 不能移动');
       }
-      touchStart = null;
     }
 
     function activeHuman() {
