@@ -167,26 +167,28 @@
 
     /* —— 输入：原生 Pointer Events（不 preventDefault，保证 click 正常合成） —— */
     function bindInput(canvas) {
+      // p5 实例模式下 createCanvas 返回 p5.Element 包装对象，取 .elt 才是 DOM 节点
+      const elt = (canvas && canvas.elt) || canvas;
       let start = null;
       let last = null;
 
-      canvas.addEventListener('pointerdown', (e) => {
+      elt.addEventListener('pointerdown', (e) => {
         if (!game || game.status !== 'playing' || game.mode === 'watch') return;
         start = { x: e.clientX, y: e.clientY };
         last = { ...start };
       });
 
-      canvas.addEventListener('pointermove', (e) => {
+      elt.addEventListener('pointermove', (e) => {
         if (start) last = { x: e.clientX, y: e.clientY };
       });
 
-      canvas.addEventListener('pointerup', () => {
+      elt.addEventListener('pointerup', () => {
         if (!start) return;
         resolveGesture(start, last);
         start = null;
       });
 
-      canvas.addEventListener('pointercancel', () => { start = null; });
+      elt.addEventListener('pointercancel', () => { start = null; });
     }
 
     /* 点击（位移 < 14px）→ 部署；滑动 → 移动一格 */
