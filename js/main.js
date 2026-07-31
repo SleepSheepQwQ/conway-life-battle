@@ -18,6 +18,10 @@
 
   const $ = (id) => document.getElementById(id);
 
+  /* 诊断埋点（logger.js 提供，缺失时静默降级） */
+  const L = (ev, d) => { try { if (window.GOLog) window.GOLog.info(ev, d); } catch (e) {} };
+  L('main_loaded', {});
+
   /* ---------- 1. 错误横幅（最先注册，任何后续错误都能在屏幕上看到） ---------- */
   function showBootError(msg) {
     let el = document.getElementById('boot-error');
@@ -42,11 +46,13 @@
 
   /* ---------- 2. 模式切换与按钮（不依赖 p5，先定义保证可点） ---------- */
   window.startGame = function (mode) {
+    L('start_game', { mode });
     lastMode = mode;
     game = new Game(mode);
     if (mode === 'watch') game.red.ai = new AI(game, game.red);
     if (mode !== 'pvp') game.blue.ai = new AI(game, game.blue);
     overShown = false;
+    L('game_created', { mode, status: game.status });
 
     hintBase = mode === 'watch' ? 'AI 自动对战' : '点击空白格部署 · 滑动移动角色';
     $('hint-text').textContent = hintBase;
@@ -119,6 +125,7 @@
     if (game.winner === 'red') text = '🔴 红方获胜！';
     else if (game.winner === 'blue') text = '🔵 蓝方获胜！';
     else text = '🤝 同归于尽，平局';
+    L('game_over', { winner: game.winner, red: game.scores().red, blue: game.scores().blue });
     $('winner-text').textContent = text;
     $('over-screen').hidden = false;
   }
@@ -130,6 +137,7 @@
       p.frameRate(60);
       renderer = new Renderer(p);
       layout();
+      L('p5_setup', { w: p.width, h: p.height, cell: renderer.layout.cell });
     };
 
     function layout() {
@@ -140,13 +148,17 @@
 
     p.windowResized = layout;
 
+    let frameCount = 0;
+
     p.draw = () => {
+      frameCount++;
       const now = p.millis();
       if (!game) return;
       game.tick(now);
       renderer.draw(p, game, now);
       updateHUD(now);
       if (game.status === 'over' && !overShown) showOver();
+      if (frameCount <= 5) L('frame', { n: frameCount });
     };
 
     /* —— 触摸输入 —— */
@@ -196,14 +208,20 @@
         // 点击 → 部署
         const cell = renderer.screenToCell(sx, sy);
         if (cell.valid) {
-          if (game.deploy(player, cell.x, cell.y, now)) flashHint('✅ ' + player.name + ' 已部署');
+          const ok = game.deploy(player, cell.x, cell.y, now);
+          L('action', { type: 'deploy', x: cell.x, y: cell.y, ok, mode: game.mode });
+          if (ok) flashHint('✅ ' + player.name + ' 已部署');
           else flashHint('❌ 不能部署在那里');
         }
       } else {
         // 滑动 → 移动一格
         const mx = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
         const my = Math.abs(dy) > Math.abs(dx) ? Math.sign(dy) : 0;
-        if (game.move(player, player.charX + mx, player.charY + my, now)) {
+        const tx = player.charX + mx;
+        const ty = player.charY + my;
+        const ok = game.move(player, tx, ty, now);
+        L('action', { type: 'move', x: tx, y: ty, ok, mode: game.mode });
+        if (ok) {
           flashHint('🚶 ' + player.name + ' 移动一格');
         } else {
           flashHint('❌ 不能移动');
@@ -219,13 +237,17 @@
     }
   };
 
-  /* ---------- 4. p5 启动（失败时显示可见错误） ---------- */
+  /* ---------- 4. p5 启动（失败时显示可见错误并上报日志） ---------- */
   if (typeof p5 === 'undefined') {
+    L('p5_init', { ok: false, reason: 'p5 undefined' });
     showBootError('p5.js 未能加载（请检查 js/lib/p5.min.js 是否存在）');
   } else {
+    L('p5_init', { ok: true, version: (p5 && p5.VERSION) || '?' });
     try {
       new p5(sketch);
+      L('p5_started', {});
     } catch (err) {
+      L('p5_init', { ok: false, error: String((err && err.stack) || err) });
       showBootError('游戏初始化失败: ' + ((err && err.message) || err));
     }
   }
