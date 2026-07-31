@@ -1,4 +1,6 @@
-/* 入口：p5 实例模式，接线输入（点击部署 / 滑动移动）、渲染与 UI */
+/* 入口：p5 实例模式，接线输入（点击部署 / 滑动移动）、渲染与 UI
+ * 初始化顺序：错误横幅（最先）→ 按钮与全局函数（不依赖 p5，保证始终可点）→ p5 启动
+ */
 (function () {
   'use strict';
 
@@ -16,7 +18,112 @@
 
   const $ = (id) => document.getElementById(id);
 
-  /* ---------- p5 草图 ---------- */
+  /* ---------- 1. 错误横幅（最先注册，任何后续错误都能在屏幕上看到） ---------- */
+  function showBootError(msg) {
+    let el = document.getElementById('boot-error');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'boot-error';
+      el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;' +
+        'background:#c62828;color:#fff;font:12px/1.5 monospace;padding:10px 14px;' +
+        'white-space:pre-wrap;word-break:break-all;cursor:pointer;';
+      el.addEventListener('click', () => el.remove());
+      document.body.appendChild(el);
+    }
+    el.textContent = '⚠️ 脚本错误: ' + msg + '（点击此条关闭）';
+  }
+
+  window.addEventListener('error', (e) => {
+    showBootError((e.message || '未知错误') + ' @ ' + (e.filename || '') + ':' + (e.lineno || ''));
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    showBootError('Promise 异常: ' + ((e.reason && e.reason.message) || e.reason));
+  });
+
+  /* ---------- 2. 模式切换与按钮（不依赖 p5，先定义保证可点） ---------- */
+  window.startGame = function (mode) {
+    lastMode = mode;
+    game = new Game(mode);
+    if (mode === 'watch') game.red.ai = new AI(game, game.red);
+    if (mode !== 'pvp') game.blue.ai = new AI(game, game.blue);
+    overShown = false;
+
+    hintBase = mode === 'watch' ? 'AI 自动对战' : '点击空白格部署 · 滑动移动角色';
+    $('hint-text').textContent = hintBase;
+    $('start-screen').hidden = true;
+    $('over-screen').hidden = true;
+    $('pvp-bar').hidden = mode !== 'pvp';
+    $('hint-bar').style.visibility = mode === 'pvp' ? 'hidden' : 'visible';
+  };
+
+  window.restart = function () { startGame(lastMode); };
+
+  window.goHome = function () {
+    game = null;
+    $('over-screen').hidden = true;
+    $('start-screen').hidden = false;
+  };
+
+  $('btn-restart').addEventListener('click', () => {
+    if (game) startGame(lastMode);
+  });
+  $('btn-red').addEventListener('click', () => {
+    if (game && game.mode === 'pvp') game.active = 'red';
+  });
+  $('btn-blue').addEventListener('click', () => {
+    if (game && game.mode === 'pvp') game.active = 'blue';
+  });
+
+  // 长按不弹菜单
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  /* ---------- HUD ---------- */
+  function updateHUD(now) {
+    if (!game) return;
+    const s = game.scores();
+    setText('score-red', s.red);
+    setText('score-blue', s.blue);
+
+    const cd = (pl) => {
+      if (!pl.charAlive) return 0;
+      return Math.max(0, Math.min(1, 1 - (pl.nextActionAt - now) / CONFIG.ACTION_COOLDOWN_MS));
+    };
+    $('cd-red').style.width = (cd(game.red) * 100).toFixed(0) + '%';
+    $('cd-blue').style.width = (cd(game.blue) * 100).toFixed(0) + '%';
+
+    let turn = '👀 观战中';
+    if (game.mode === 'pvp') turn = game.active === 'red' ? '🔴 红方行动' : '🔵 蓝方行动';
+    else if (game.mode === 'pve') turn = '你是 🔴 红方';
+    setText('turn-info', turn);
+
+    if (game.mode === 'pvp') {
+      $('btn-red').classList.toggle('active', game.active === 'red');
+      $('btn-blue').classList.toggle('active', game.active === 'blue');
+    }
+  }
+
+  function setText(id, v) {
+    const el = $(id);
+    if (el && el.textContent !== String(v)) el.textContent = String(v);
+  }
+
+  function flashHint(msg) {
+    if (hintTimer) clearTimeout(hintTimer);
+    $('hint-text').textContent = msg;
+    hintTimer = setTimeout(() => { $('hint-text').textContent = hintBase; }, 1200);
+  }
+
+  function showOver() {
+    overShown = true;
+    let text = '';
+    if (game.winner === 'red') text = '🔴 红方获胜！';
+    else if (game.winner === 'blue') text = '🔵 蓝方获胜！';
+    else text = '🤝 同归于尽，平局';
+    $('winner-text').textContent = text;
+    $('over-screen').hidden = false;
+  }
+
+  /* ---------- 3. p5 草图 ---------- */
   const sketch = (p) => {
     p.setup = () => {
       p.createCanvas(window.innerWidth, window.innerHeight);
@@ -112,88 +219,14 @@
     }
   };
 
-  new p5(sketch);
-
-  /* ---------- HUD ---------- */
-  function updateHUD(now) {
-    if (!game) return;
-    const s = game.scores();
-    setText('score-red', s.red);
-    setText('score-blue', s.blue);
-
-    const cd = (pl) => {
-      if (!pl.charAlive) return 0;
-      return Math.max(0, Math.min(1, 1 - (pl.nextActionAt - now) / CONFIG.ACTION_COOLDOWN_MS));
-    };
-    $('cd-red').style.width = (cd(game.red) * 100).toFixed(0) + '%';
-    $('cd-blue').style.width = (cd(game.blue) * 100).toFixed(0) + '%';
-
-    let turn = '👀 观战中';
-    if (game.mode === 'pvp') turn = game.active === 'red' ? '🔴 红方行动' : '🔵 蓝方行动';
-    else if (game.mode === 'pve') turn = '你是 🔴 红方';
-    setText('turn-info', turn);
-
-    if (game.mode === 'pvp') {
-      $('btn-red').classList.toggle('active', game.active === 'red');
-      $('btn-blue').classList.toggle('active', game.active === 'blue');
+  /* ---------- 4. p5 启动（失败时显示可见错误） ---------- */
+  if (typeof p5 === 'undefined') {
+    showBootError('p5.js 未能加载（请检查 js/lib/p5.min.js 是否存在）');
+  } else {
+    try {
+      new p5(sketch);
+    } catch (err) {
+      showBootError('游戏初始化失败: ' + ((err && err.message) || err));
     }
   }
-
-  function setText(id, v) {
-    const el = $(id);
-    if (el && el.textContent !== String(v)) el.textContent = String(v);
-  }
-
-  function flashHint(msg) {
-    if (hintTimer) clearTimeout(hintTimer);
-    $('hint-text').textContent = msg;
-    hintTimer = setTimeout(() => { $('hint-text').textContent = hintBase; }, 1200);
-  }
-
-  function showOver() {
-    overShown = true;
-    let text = '';
-    if (game.winner === 'red') text = '🔴 红方获胜！';
-    else if (game.winner === 'blue') text = '🔵 蓝方获胜！';
-    else text = '🤝 同归于尽，平局';
-    $('winner-text').textContent = text;
-    $('over-screen').hidden = false;
-  }
-
-  /* ---------- 模式切换 / 按钮 ---------- */
-  window.startGame = function (mode) {
-    lastMode = mode;
-    game = new Game(mode);
-    if (mode === 'watch') game.red.ai = new AI(game, game.red);
-    if (mode !== 'pvp') game.blue.ai = new AI(game, game.blue);
-    overShown = false;
-
-    hintBase = mode === 'watch' ? 'AI 自动对战' : '点击空白格部署 · 滑动移动角色';
-    $('hint-text').textContent = hintBase;
-    $('start-screen').hidden = true;
-    $('over-screen').hidden = true;
-    $('pvp-bar').hidden = mode !== 'pvp';
-    $('hint-bar').style.visibility = mode === 'pvp' ? 'hidden' : 'visible';
-  };
-
-  window.restart = function () { startGame(lastMode); };
-
-  window.goHome = function () {
-    game = null;
-    $('over-screen').hidden = true;
-    $('start-screen').hidden = false;
-  };
-
-  $('btn-restart').addEventListener('click', () => {
-    if (game) startGame(lastMode);
-  });
-  $('btn-red').addEventListener('click', () => {
-    if (game && game.mode === 'pvp') game.active = 'red';
-  });
-  $('btn-blue').addEventListener('click', () => {
-    if (game && game.mode === 'pvp') game.active = 'blue';
-  });
-
-  // 长按不弹菜单
-  document.addEventListener('contextmenu', (e) => e.preventDefault());
 })();

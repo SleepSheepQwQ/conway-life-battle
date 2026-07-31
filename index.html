@@ -8,6 +8,12 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <noscript>
+    <div style="position:fixed;inset:0;z-index:99999;background:#0b0e14;color:#fff;display:flex;align-items:center;justify-content:center;text-align:center;font-size:16px;padding:24px;">
+      此游戏需要启用 JavaScript 才能运行
+    </div>
+  </noscript>
+
   <!-- 顶部 HUD -->
   <div id="hud">
     <div class="chip">
@@ -15,7 +21,7 @@
       <div class="cd"><i id="cd-red"></i></div>
     </div>
     <div id="turn-info">—</div>
-    <button id="btn-restart" title="重新开始本局">↻</button>
+    <button id="btn-restart" type="button" title="重新开始本局">↻</button>
     <div class="chip">
       <div class="row"><span class="dot blue"></span><b id="score-blue">0</b></div>
       <div class="cd"><i id="cd-blue"></i></div>
@@ -25,17 +31,17 @@
   <!-- 底部提示 / 热座按钮 -->
   <div id="hint-bar"><span id="hint-text">点击空白格部署 · 滑动移动角色</span></div>
   <div id="pvp-bar" hidden>
-    <button id="btn-red" class="pvp-btn red">🔴 红方行动</button>
-    <button id="btn-blue" class="pvp-btn blue">🔵 蓝方行动</button>
+    <button id="btn-red" type="button" class="pvp-btn red">🔴 红方行动</button>
+    <button id="btn-blue" type="button" class="pvp-btn blue">🔵 蓝方行动</button>
   </div>
 
   <!-- 开始界面 -->
   <div id="start-screen" class="overlay">
     <div class="title">生命棋局</div>
     <div class="subtitle">红蓝对决 · 康威生命游戏</div>
-    <button class="mode-btn" onclick="startGame('pvp')">⚔️ 双人对战（同屏热座）</button>
-    <button class="mode-btn" onclick="startGame('pve')">🤖 人机对战（你是红方）</button>
-    <button class="mode-btn" onclick="startGame('watch')">👀 观战模式（AI 互斗）</button>
+    <button class="mode-btn" type="button" onclick="startGame('pvp')">⚔️ 双人对战（同屏热座）</button>
+    <button class="mode-btn" type="button" onclick="startGame('pve')">🤖 人机对战（你是红方）</button>
+    <button class="mode-btn" type="button" onclick="startGame('watch')">👀 观战模式（AI 互斗）</button>
     <div class="rules">
       <b>规则</b><br>
       · 红蓝各有一个带<b>白色光环</b>的角色，对角开局<br>
@@ -50,8 +56,8 @@
   <!-- 结算界面 -->
   <div id="over-screen" class="overlay" hidden>
     <h2 id="winner-text"></h2>
-    <button class="mode-btn" onclick="restart()">🔄 再来一局</button>
-    <button class="mode-btn ghost" onclick="goHome()">🏠 返回主菜单</button>
+    <button class="mode-btn" type="button" onclick="restart()">🔄 再来一局</button>
+    <button class="mode-btn ghost" type="button" onclick="goHome()">🏠 返回主菜单</button>
   </div>
 
   <script src="js/lib/p5.min.js"></script>

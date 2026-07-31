@@ -104,8 +104,6 @@ canvas {
   background: rgba(6, 8, 12, 0.55);
   padding: 6px 14px;
   border-radius: 999px;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
 }
 
 #pvp-bar {
@@ -137,6 +135,10 @@ canvas {
 .pvp-btn.blue { background: #2e8bff; }
 .pvp-btn.active { opacity: 1; box-shadow: inset 0 0 0 2px #fff; }
 
+/* hidden 属性优先级修正（避免被 display:flex 覆盖导致误显示） */
+#pvp-bar[hidden],
+#hint-bar[hidden] { display: none !important; }
+
 /* ---------- 覆盖层（开始 / 结算） ---------- */
 .overlay {
   position: fixed;
@@ -149,10 +151,9 @@ canvas {
   gap: 14px;
   padding: 24px;
   text-align: center;
-  background: rgba(6, 8, 12, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(6, 8, 12, 0.88);
   color: #fff;
+  overflow-y: auto; /* 小屏内容超高时可滚动 */
 }
 .overlay[hidden] { display: none; }
 
